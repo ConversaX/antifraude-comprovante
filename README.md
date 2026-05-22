@@ -145,6 +145,26 @@ antifraude-comprovante/
 
 ---
 
+## ⚠️ Aviso Legal e Isenção de Responsabilidade
+
+Este projeto é um **MVP experimental** disponibilizado "como está", sem garantias de qualquer tipo.
+
+**Pontos importantes:**
+
+1. **Não é produto final:** Requer testes extensivos, validações de segurança, tratamento de edge cases e adaptação às regras de negócio específicas antes de qualquer uso em produção.
+
+2. **Falsos positivos/negativos:** Sistemas de IA podem errar. Esta ferramenta é um auxílio à decisão, não substitui auditoria humana. Decisões críticas devem sempre ter revisão manual.
+
+3. **Sem garantia:** O autor não se responsabiliza por perdas financeiras, decisões equivocadas ou qualquer dano direto/indireto decorrente do uso deste código.
+
+4. **LGPD/Dados:** Ao usar com fotos reais de clientes, garanta conformidade com LGPD. Dados EXIF podem conter localização precisa.
+
+5. **Use por sua conta e risco:** Ao fazer fork/clone deste repositório, você concorda que testará e validará tudo por conta própria.
+
+Para uso comercial, recomenda-se consultoria jurídica e técnica especializada.
+
+---
+
 ## Licença
 
 MIT © 2026 — sinta-se livre para usar, modificar e contribuir.
