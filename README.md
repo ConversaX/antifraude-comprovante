@@ -10,161 +10,118 @@ Sistema inteligente de detecção de fraudes em comprovantes de entrega logísti
 
 ---
 
-## O problema
-
-Empresas de logística sofrem diariamente com motoristas que enviam comprovantes falsos, reutilizados ou fotografados no lugar errado — sem que ninguém perceba. Este sistema automatiza a verificação.
-
----
-
-## Como funciona
-
-Cada imagem enviada passa por **5 camadas de análise simultâneas**:
-
-| Camada | O que verifica |
-|---|---|
-| 🤖 **IA (Claude Haiku)** | A foto mostra uma entrega real? Pacote, local, pessoa recebendo? |
-| 📍 **GPS EXIF** | Coordenadas da foto batem com o endereço informado? |
-| 🔍 **OpenCV Canny** | Há sinais de edição digital ou manipulação? |
-| 🔑 **Hash MD5** | Essa imagem já foi enviada antes? |
-| 👁️ **Hash Visual (pHash)** | Imagem visualmente idêntica a outra já analisada? |
-
-**Score final:** soma ponderada das 5 camadas → **Aprovado** (≤ 70) ou **Suspeito** (> 70)
+## O que é (resposta curta)
+Um MVP que automatiza a detecção de fraudes em comprovantes de entrega usando Claude (IA), OCR (EasyOCR), OpenCV (detecção de edição), hashes (MD5 + pHash) e validação de GPS — pensado para equipes de logística e operações que querem reduzir fraudes por comprovantes falsos ou reutilizados.
 
 ---
 
-## Stack
-
-- **Backend:** FastAPI + Uvicorn
-- **Frontend:** Streamlit
-- **IA:** Anthropic Claude Haiku 4.5 (visão computacional)
-- **OCR:** EasyOCR (português + inglês, CPU)
-- **Imagem:** OpenCV, Pillow, imagehash
-- **GPS:** EXIF + Google Maps Geocoding API
-- **Banco:** SQLite
-- **Gerenciador de pacotes:** uv
+## Por que ainda não publicar globalmente
+Resumo rápido: o projeto é executável e útil como MVP, mas precisa de hardening (autenticação, rate limiting distribuído), compliance (LGPD, política de retenção), infraestrutura (DB escalável, worker assíncrono) e testes/CI completos antes de um lançamento público.
 
 ---
 
-## Pré-requisitos
+## Como funciona (resumo técnico)
+Cada imagem passa por 5 camadas:
+- 🤖 Claude Haiku: avaliação semântica/visão (imagem embutida em base64);
+- 📍 EXIF GPS: extração e comparação com endereço via Google Geocoding (opcional);
+- 🔍 OpenCV (Canny): heurística de edição (edge density);
+- 🔑 MD5: bloqueio de duplicatas exatas;
+- 👁️ pHash (imagehash): detecção de duplicatas visuais (Hamming threshold configurável).
 
-- Python 3.11
-- [`uv`](https://docs.astral.sh/uv/) instalado
-- Chave de API da [Anthropic](https://console.anthropic.com/)
-- Chave de API do [Google Maps](https://console.cloud.google.com/) *(opcional — para validação GPS)*
+O score final é composto pela IA + heurísticas; veredito: Aprovado (≤ 70) ou Suspeito (> 70).
 
 ---
 
-## Instalação
+## Rápido — como rodar (Docker recomendado)
+1) Copie as variáveis de ambiente do `.env.example` e configure as chaves (ANTHROPIC_API_KEY obrigatório).
+2) Inicie com Docker Compose (recomendado para dev):
 
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/antifraude-comprovante.git
-cd antifraude-comprovante
-
-# 2. Crie o ambiente virtual com Python 3.11
-uv venv --python 3.11
-
-# 3. Instale as dependências
-uv pip install -r requirements.txt
-
-# 4. Configure as variáveis de ambiente
-cp .env.example .env
-# Edite o .env e adicione suas chaves
+# constrói e sobe API + Streamlit (dev)
+docker-compose up --build
 ```
 
-> ⚠️ **PyTorch no Windows:** se ocorrer erro de DLL ao iniciar, instale a versão CPU:
-> ```bash
-> uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --force-reinstall
-> ```
+A API estará em: http://localhost:8000
+Streamlit: http://localhost:8501
 
----
-
-## Configuração
-
-Edite o arquivo `.env`:
-
-```env
-ANTHROPIC_API_KEY=sk-ant-...        # Obrigatório
-GOOGLE_MAPS_API_KEY=AIza...         # Opcional (validação GPS)
+Variáveis essenciais no `.env` (exemplos):
+```
+ANTHROPIC_API_KEY=sk-ant-...
+API_KEY=sua-chave-secreta
+GOOGLE_MAPS_API_KEY=...
+DATABASE_URL=fraudes.db
+PHASH_THRESHOLD=10
+MAX_UPLOAD_MB=10
+RATE_LIMIT=20
+RATE_PERIOD=60
 ```
 
 ---
 
-## Rodando o projeto
+## Modo demo (para demonstrações públicas)
+Se quiser disponibilizar uma demo pública sem custos/risco de dados:
+- execute com `DEMO_MODE=1` (a branch contém suporte para modo demo) — o modo demo pula chamadas à Anthropic e não persiste imagens.
+- limite o tráfego com um proxy (ex.: Cloud Run) e monitore quotas.
 
-**Windows — clique duas vezes em `start.bat`**, ou manualmente:
+---
+
+## Exemplos de API (cURL)
+POST /analisar — enviar imagem + endereço:
 
 ```bash
-# Terminal 1 — API
-.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000
-
-# Terminal 2 — Interface
-.venv\Scripts\streamlit.exe run app.py
+curl -X POST "http://localhost:8000/analisar" \
+  -H "X-API-KEY: sua-chave-secreta" \
+  -F "file=@/caminho/para/comprovante.jpg" \
+  -F "endereco=Rua das Flores, 123, São Paulo, SP"
 ```
 
-Acesse: **http://localhost:8501**
+GET /historico — últimas 100 análises:
 
-API Swagger: **http://localhost:8000/docs**
-
----
-
-## Estrutura
-
+```bash
+curl -H "X-API-KEY: sua-chave-secreta" http://localhost:8000/historico
 ```
-antifraude-comprovante/
-├── main.py            # API FastAPI — lógica de análise híbrida
-├── app.py             # Interface Streamlit — 2 abas
-├── database.py        # SQLite — persistência das análises
-├── fraud_detector.py  # OpenCV + imagehash
-├── requirements.txt
-├── start.bat          # Inicialização rápida (Windows)
-├── .env.example
-└── .gitignore
+
+GET /health
+```bash
+curl http://localhost:8000/health
 ```
 
 ---
 
-## Endpoints
-
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/analisar` | Analisa comprovante (`multipart/form-data`) |
-| `GET` | `/historico` | Últimas 100 análises |
-| `GET` | `/health` | Status da API |
-| `GET` | `/docs` | Swagger interativo |
-
----
-
-## O que reprova automaticamente
-
-- Foto do baú, moto ou veículo sem evidência de entrega
-- Selfie do entregador sem local nem pacote
-- Imagem duplicada (já enviada antes)
-- GPS da foto a mais de 2 km do endereço informado
-- Sinais de edição digital (OpenCV)
+## Recomendações para produção (essenciais)
+- Autenticação & autorização: use API keys rotativas ou OAuth; não exponha endpoints sem proteção.
+- TLS: coloque a API atrás de um reverse-proxy (NGINX, Cloud Run, ALB) com HTTPS.
+- Rate limiting distribuído: não confie em in-memory para produção — use Redis/Proxy para limites globais.
+- Worker assíncrono: mova chamadas à IA para uma fila (Redis + RQ/Celery) para reduzir latência e controlar retries/custos.
+- Banco: migrar para Postgres (ou managed DB) com Alembic para migrations.
+- Segurança de upload: validar MIME, tamanho, e sanitizar nomes; escanear arquivos suspeitos.
+- Privacidade/LGPD: criar política de retenção, consentimento explícito e ferramentas de anonimização/exclusão.
 
 ---
 
-## ⚠️ Aviso Legal e Isenção de Responsabilidade
+## Testes, CI e infra incluídos nesta branch
+- `.github/workflows/ci.yml` — workflow básico (lint + pytest).
+- `Dockerfile` + `docker-compose.yml` — ambiente local reproducível.
+- Tests iniciais em `tests/` (fraud_detector, database).
 
-Este projeto é um **MVP experimental** disponibilizado "como está", sem garantias de qualquer tipo.
+---
 
-**Pontos importantes:**
+## Troubleshooting rápido
+- PyTorch/Windows: se houver erro de DLL, instale a versão CPU do torch conforme o README original.
+- EasyOCR/CI: runners podem falhar sem libs de sistema (instale dependências do sistema no Dockerfile ou use runners self-hosted).
+- Timeouts com Anthropic: verifique quota e tempo limite do request; prefira worker para chamadas longas.
 
-1. **Não é produto final:** Requer testes extensivos, validações de segurança, tratamento de edge cases e adaptação às regras de negócio específicas antes de qualquer uso em produção.
+---
 
-2. **Falsos positivos/negativos:** Sistemas de IA podem errar. Esta ferramenta é um auxílio à decisão, não substitui auditoria humana. Decisões críticas devem sempre ter revisão manual.
+## Próximos passos sugeridos (eu posso implementar)
+- 1) Worker assíncrono (Redis + RQ) e atualização do docker-compose — recomendado próximo PR.
+- 2) Migrar para Postgres + Alembic (migrations) e testes de integração.
+- 3) Cobertura de testes e GH Actions com coverage/report.
+- 4) Revisão legal/PRIVACY.md para conformidade LGPD.
 
-3. **Sem garantia:** O autor não se responsabiliza por perdas financeiras, decisões equivocadas ou qualquer dano direto/indireto decorrente do uso deste código.
-
-4. **LGPD/Dados:** Ao usar com fotos reais de clientes, garanta conformidade com LGPD. Dados EXIF podem conter localização precisa.
-
-5. **Use por sua conta e risco:** Ao fazer fork/clone deste repositório, você concorda que testará e validará tudo por conta própria.
-
-Para uso comercial, recomenda-se consultoria jurídica e técnica especializada.
+Se quiser, eu aplico essas alterações automaticamente na branch `feat/production-ready` (já está atualizada) e abro um PR — ou posso abrir PRs menores para cada bloco (infra, DB, worker).
 
 ---
 
 ## Licença
-
 MIT © 2026 — sinta-se livre para usar, modificar e contribuir.
